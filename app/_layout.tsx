@@ -2,6 +2,7 @@ import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import * as NavigationBar from 'expo-navigation-bar';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import React from 'react';
 import { useEffect } from 'react';
 import { Platform, StatusBar as RNStatusBar } from 'react-native';
 import 'react-native-reanimated';
