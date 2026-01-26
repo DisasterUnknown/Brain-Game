@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
     Dimensions,
     ScrollView,
@@ -14,7 +14,7 @@ import Svg, { Polygon } from 'react-native-svg';
 
 const { width, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const currentLevel = 20;
+const currentLevel = 39;
 const HEX_SIZE = 35;
 const HEX_HEIGHT = HEX_SIZE * 2;
 const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE;
@@ -50,7 +50,7 @@ const Hexagon = React.memo(({ level, x, y, type }: HexProps) => {
     const isEmpty = type === 'empty';
     const tileColor = isBoss ? '#ff0033' : isEmpty ? '#330055' : type === 'current' ? '#6cff5e' : type === 'completed' ? '#ff66ff' : '#ff7566';
     const tileTextColor = isBoss ? styles.bossText : type === 'completed' ? styles.completedText : type === 'current' ? styles.currentText : styles.lockedText;
-    const tileBgColor = isBoss ? 'transparent' : isEmpty ? '#0a0015' : type === 'current' ? '#042c00' : type === 'completed' ? '#1a0033' : '#2b0400';
+    const tileBgColor = isBoss ? 'transparent' : isEmpty ? '#0a0015' : type === 'current' ? '#042c006f' : type === 'completed' ? '#1a0033' : '#2b04006d';
 
     return (
         <View style={[styles.hexContainer, { left: x, top: y }]}>
