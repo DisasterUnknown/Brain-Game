@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import {
     Dimensions,
     ScrollView,
@@ -12,13 +12,26 @@ import {
 import { Easing, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import Svg, { Polygon } from 'react-native-svg';
 
-const { width } = Dimensions.get('window');
+const { width, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+const currentLevel = 20;
 const HEX_SIZE = 35;
 const HEX_HEIGHT = HEX_SIZE * 2;
 const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE;
 const VERT_SPACING = HEX_HEIGHT * 0.75;
 const HORIZ_SPACING = HEX_WIDTH;
+
+// Pre-calculate points string once to save CPU cycles
+const HEX_POINTS = [
+    [HEX_WIDTH / 2, 0],
+    [HEX_WIDTH, HEX_HEIGHT / 4],
+    [HEX_WIDTH, (HEX_HEIGHT * 3) / 4],
+    [HEX_WIDTH / 2, HEX_HEIGHT],
+    [0, (HEX_HEIGHT * 3) / 4],
+    [0, HEX_HEIGHT / 4],
+]
+    .map(p => `${p[0]},${p[1]}`)
+    .join(' ');
 
 /* ========================= TYPES ========================= */
 
@@ -29,20 +42,10 @@ interface HexProps {
     type: 'normal' | 'boss' | 'empty';
 }
 
-/* ========================= HEX ========================= */
+/* ========================= HEX (MEMOIZED) ========================= */
 
-const Hexagon: React.FC<HexProps> = ({ level, x, y, type }) => {
-    const points = [
-        [HEX_WIDTH / 2, 0],
-        [HEX_WIDTH, HEX_HEIGHT / 4],
-        [HEX_WIDTH, (HEX_HEIGHT * 3) / 4],
-        [HEX_WIDTH / 2, HEX_HEIGHT],
-        [0, (HEX_HEIGHT * 3) / 4],
-        [0, HEX_HEIGHT / 4],
-    ]
-        .map(p => `${p[0]},${p[1]}`)
-        .join(' ');
-
+// React.memo prevents unnecessary re-renders of the hundreds of hexagons
+const Hexagon = React.memo(({ level, x, y, type }: HexProps) => {
     const isBoss = type === 'boss';
     const isEmpty = type === 'empty';
 
@@ -50,21 +53,9 @@ const Hexagon: React.FC<HexProps> = ({ level, x, y, type }) => {
         <View style={[styles.hexContainer, { left: x, top: y }]}>
             <Svg width={HEX_WIDTH} height={HEX_HEIGHT}>
                 <Polygon
-                    points={points}
-                    fill={
-                        isBoss
-                            ? 'transparent'
-                            : isEmpty
-                            ? '#0a0015'
-                            : '#1a0033'
-                    }
-                    stroke={
-                        isBoss
-                            ? '#ff0033'
-                            : isEmpty
-                            ? '#330055'
-                            : '#ff66ff'
-                    }
+                    points={HEX_POINTS}
+                    fill={isBoss ? 'transparent' : isEmpty ? '#0a0015' : '#1a0033'}
+                    stroke={isBoss ? '#ff0033' : isEmpty ? '#330055' : '#ff66ff'}
                     strokeWidth={isBoss ? 3 : isEmpty ? 1 : 2}
                     opacity={isEmpty ? 0.3 : 1}
                 />
@@ -72,25 +63,21 @@ const Hexagon: React.FC<HexProps> = ({ level, x, y, type }) => {
 
             {!isEmpty && (
                 <View style={[styles.hexContent, { width: HEX_WIDTH, height: HEX_HEIGHT }]}>
-                    <Text
-                        style={[
-                            styles.hexText,
-                            isBoss && styles.bossText,
-                        ]}
-                    >
+                    <Text style={[styles.hexText, isBoss && styles.bossText]}>
                         {isBoss ? '∞' : level}
                     </Text>
                 </View>
             )}
         </View>
     );
-};
+});
 
 /* ========================= SCREEN ========================= */
 
 export default function MapScreen() {
     const router = useRouter();
     const glow = useSharedValue(0);
+    const scrollRef = useRef<ScrollView>(null);
 
     useEffect(() => {
         glow.value = withRepeat(
@@ -100,20 +87,13 @@ export default function MapScreen() {
         );
     }, []);
 
-    const generateHexMap = () => {
-        const hexes: HexProps[] = [];
-
+    // Memoize the entire map data so it only generates ONCE
+    const hexes = useMemo(() => {
+        const hexData: HexProps[] = [];
         const rows = 60;
         const cols = 10;
 
-        /* ===== PATTERNS ===== */
-
-        const bossPattern = [
-            [2, 3], [2, 4],
-            [3, 2], [3, 3], [3, 4],
-            [4, 3], [4, 4],
-        ];
-
+        const bossPattern = [[2, 3], [2, 4], [3, 2], [3, 3], [3, 4], [4, 3], [4, 4]];
         const levelPattern = [
             [16, 5], [15, 3], [43, 0], [42, 2], [31, 5], [43, 6], [38, 5],
             [42, 4], [37, 2], [13, 3], [42, 6], [26, 3], [7, 2], [48, 5],
@@ -135,41 +115,41 @@ export default function MapScreen() {
         ];
 
         const bossSet = new Set(bossPattern.map(p => `${p[0]}-${p[1]}`));
-        const levelSet = new Set(levelPattern.slice(0, 100).map(p => `${p[0]}-${p[1]}`));
+        const levelSet = new Set(levelPattern.map(p => `${p[0]}-${p[1]}`));
 
         let levelCounter = 1;
-
         const totalColsView = 8;
         const gridWidth = totalColsView * HORIZ_SPACING;
         const offsetXStart = (width - gridWidth) / 2;
 
         for (let row = rows - 1; row >= 0; row--) {
             const isEvenRow = row % 2 === 0;
-
             for (let col = -2; col < cols; col++) {
-                const x =
-                    col * HORIZ_SPACING +
-                    offsetXStart +
-                    (isEvenRow ? 0 : HORIZ_SPACING / 2);
-
+                const x = col * HORIZ_SPACING + offsetXStart + (isEvenRow ? 0 : HORIZ_SPACING / 2);
                 const y = row * VERT_SPACING - 50;
                 const key = `${row}-${col}`;
 
                 if (bossSet.has(key)) {
-                    hexes.push({ level: null, x, y, type: 'boss' });
+                    hexData.push({ level: null, x, y, type: 'boss' });
                 } else if (levelSet.has(key) && levelCounter <= 100) {
-                    hexes.push({ level: levelCounter, x, y, type: 'normal' });
-                    levelCounter++;
+                    hexData.push({ level: levelCounter++, x, y, type: 'normal' });
                 } else {
-                    hexes.push({ level: null, x, y, type: 'empty' });
+                    hexData.push({ level: null, x, y, type: 'empty' });
                 }
             }
         }
+        return hexData;
+    }, []);
 
-        return hexes;
-    };
-
-    const hexes = generateHexMap();
+    // Faster scrolling logic
+    useEffect(() => {
+        const currentHex = hexes.find(h => h.level === currentLevel);
+        if (currentHex) {
+            const scrollPosition = currentHex.y - SCREEN_HEIGHT / 2 + HEX_HEIGHT / 2;
+            // Immediate scroll without a timeout feels snappier
+            scrollRef.current?.scrollTo({ y: scrollPosition, animated: false });
+        }
+    }, [hexes]);
 
     return (
         <View style={styles.container}>
@@ -179,16 +159,28 @@ export default function MapScreen() {
             />
 
             <ScrollView
+                ref={scrollRef}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
+                // Optimization: remove items from memory when far off-screen
+                removeClippedSubviews={true} 
             >
                 {hexes.map((hex, i) => (
-                    <Hexagon key={i} {...hex} />
+                    <Hexagon key={`${hex.x}-${hex.y}`} {...hex} />
                 ))}
             </ScrollView>
 
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-                <Text style={styles.backButtonText}>← Back</Text>
+            <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.back()}
+                activeOpacity={0.8}
+            >
+                <LinearGradient
+                    colors={['#ff00ff9d', '#330066dd']}
+                    style={styles.backButtonGradient}
+                >
+                    <Text style={styles.backButtonText}>← Back</Text>
+                </LinearGradient>
             </TouchableOpacity>
         </View>
     );
@@ -198,7 +190,7 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    scrollContent: { minHeight: HEX_SIZE * 78 },
+    scrollContent: { height: HEX_SIZE * 78 }, // Fixed height is faster than minHeight
     hexContainer: { position: 'absolute' },
     hexContent: {
         position: 'absolute',
@@ -221,15 +213,21 @@ const styles = StyleSheet.create({
     backButton: {
         position: 'absolute',
         bottom: 30,
-        left: 20,
-        backgroundColor: '#330066',
+        left: 30,
+        borderRadius: 15,
+        overflow: 'hidden',
+    },
+    backButtonGradient: {
         paddingVertical: 15,
         paddingHorizontal: 25,
-        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     backButtonText: {
         color: '#f8b9f8',
         fontSize: 18,
         fontWeight: 'bold',
+        textShadowColor: '#ff33ff',
+        textShadowRadius: 10,
     },
 });
