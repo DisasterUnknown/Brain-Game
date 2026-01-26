@@ -39,7 +39,7 @@ interface HexProps {
     level: number | null;
     x: number;
     y: number;
-    type: 'normal' | 'boss' | 'empty';
+    type: 'completed' | 'current' | 'locked' | 'boss' | 'empty';
 }
 
 /* ========================= HEX (MEMOIZED) ========================= */
@@ -48,6 +48,8 @@ interface HexProps {
 const Hexagon = React.memo(({ level, x, y, type }: HexProps) => {
     const isBoss = type === 'boss';
     const isEmpty = type === 'empty';
+    const tileColor = isBoss ? '#ff0033' : isEmpty ? '#330055' : type === 'current' ? '#6cff5e' : type === 'completed' ? '#ff66ff' : '#ff7566';
+    const tileTextColor = isBoss ? styles.bossText : type === 'completed' ? styles.completedText : type === 'current' ? styles.currentText : styles.lockedText;
 
     return (
         <View style={[styles.hexContainer, { left: x, top: y }]}>
@@ -55,16 +57,16 @@ const Hexagon = React.memo(({ level, x, y, type }: HexProps) => {
                 <Polygon
                     points={HEX_POINTS}
                     fill={isBoss ? 'transparent' : isEmpty ? '#0a0015' : '#1a0033'}
-                    stroke={isBoss ? '#ff0033' : isEmpty ? '#330055' : '#ff66ff'}
-                    strokeWidth={isBoss ? 3 : isEmpty ? 1 : 2}
-                    opacity={isEmpty ? 0.3 : 1}
+                    stroke={tileColor}
+                    strokeWidth={isBoss ? 3 : isEmpty ? 4 : 2}
+                    opacity={isEmpty ? 0.4 : 1}
                 />
             </Svg>
 
             {!isEmpty && (
                 <View style={[styles.hexContent, { width: HEX_WIDTH, height: HEX_HEIGHT }]}>
-                    <Text style={[styles.hexText, isBoss && styles.bossText]}>
-                        {isBoss ? '∞' : level}
+                    <Text style={tileTextColor}>
+                        {isBoss ? '∞' : type === 'locked' ? 'LK' : level}
                     </Text>
                 </View>
             )}
@@ -131,8 +133,12 @@ export default function MapScreen() {
 
                 if (bossSet.has(key)) {
                     hexData.push({ level: null, x, y, type: 'boss' });
-                } else if (levelSet.has(key) && levelCounter <= 100) {
-                    hexData.push({ level: levelCounter++, x, y, type: 'normal' });
+                } else if (levelSet.has(key) && levelCounter < currentLevel) {
+                    hexData.push({ level: levelCounter++, x, y, type: 'completed' });
+                } else if (levelSet.has(key) && levelCounter == currentLevel) {
+                    hexData.push({ level: levelCounter++, x, y, type: 'current' });
+                } else if (levelSet.has(key) && levelCounter > currentLevel) {
+                    hexData.push({ level: levelCounter++, x, y, type: 'locked' });
                 } else {
                     hexData.push({ level: null, x, y, type: 'empty' });
                 }
@@ -163,7 +169,7 @@ export default function MapScreen() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
                 // Optimization: remove items from memory when far off-screen
-                removeClippedSubviews={true} 
+                removeClippedSubviews={true}
             >
                 {hexes.map((hex, i) => (
                     <Hexagon key={`${hex.x}-${hex.y}`} {...hex} />
@@ -197,7 +203,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    hexText: {
+    completedText: {
         color: '#f8acf8',
         fontSize: 14,
         fontWeight: 'bold',
@@ -209,6 +215,18 @@ const styles = StyleSheet.create({
         fontSize: 22,
         textShadowColor: '#ff0033',
         textShadowRadius: 15,
+    },
+    lockedText: {
+        color: '#ff7566',
+        fontSize: 14,
+        textShadowColor: '#ff7566',
+        textShadowRadius: 10,
+    },
+    currentText: {
+        color: '#6cff5e',
+        fontSize: 14,
+        textShadowColor: '#6cff5e',
+        textShadowRadius: 10,
     },
     backButton: {
         position: 'absolute',
