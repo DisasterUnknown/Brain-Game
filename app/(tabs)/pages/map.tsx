@@ -50,13 +50,14 @@ const Hexagon = React.memo(({ level, x, y, type }: HexProps) => {
     const isEmpty = type === 'empty';
     const tileColor = isBoss ? '#ff0033' : isEmpty ? '#330055' : type === 'current' ? '#6cff5e' : type === 'completed' ? '#ff66ff' : '#ff7566';
     const tileTextColor = isBoss ? styles.bossText : type === 'completed' ? styles.completedText : type === 'current' ? styles.currentText : styles.lockedText;
+    const tileBgColor = isBoss ? 'transparent' : isEmpty ? '#0a0015' : type === 'current' ? '#042c00' : type === 'completed' ? '#1a0033' : '#2b0400';
 
     return (
         <View style={[styles.hexContainer, { left: x, top: y }]}>
             <Svg width={HEX_WIDTH} height={HEX_HEIGHT}>
                 <Polygon
                     points={HEX_POINTS}
-                    fill={isBoss ? 'transparent' : isEmpty ? '#0a0015' : '#1a0033'}
+                    fill={tileBgColor}
                     stroke={tileColor}
                     strokeWidth={isBoss ? 3 : isEmpty ? 4 : 2}
                     opacity={isEmpty ? 0.4 : 1}
@@ -66,7 +67,7 @@ const Hexagon = React.memo(({ level, x, y, type }: HexProps) => {
             {!isEmpty && (
                 <View style={[styles.hexContent, { width: HEX_WIDTH, height: HEX_HEIGHT }]}>
                     <Text style={tileTextColor}>
-                        {isBoss ? '∞' : type === 'locked' ? 'LK' : level}
+                        {isBoss ? '∞' : type === 'locked' ? 'LOCK' : level}
                     </Text>
                 </View>
             )}
